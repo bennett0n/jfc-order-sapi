@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
     <http:listener-config name="jfc-order-sapi-httpListenerConfig">
         <http:listener-connection host="0.0.0.0" port="8081" />
     </http:listener-config>
@@ -124,37 +125,53 @@ output application/json
         </error-handler>
     </flow>
     <flow name="get:\orders\(orderId):jfc-order-sapi-config">
-        <ee:transform doc:name="Transform Message">
-            <ee:variables>
-                <ee:set-variable variableName="orderId">attributes.uriParams.'orderId'</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
-        <ee:transform doc:name="Transform Message">
+        <set-variable value="#[attributes.queryParams]" doc:name="queryParam" doc:id="8e18508a-e76a-4a29-a50f-1b2c994651b8" variableName="queryParam"/>
+		<set-variable value="#[attributes.uriParams]" doc:name="uriParams" doc:id="b8937b37-148b-4ae9-ad46-13db1da68fa4" variableName="uriParams" />
+		<ee:transform doc:name="generate dynamic_where" doc:id="7118ab7c-bada-4de3-9173-a8f362b2f0f6" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="dynamic_where" ><![CDATA[%dw 2.0
+output application/java
+
+var sql_where = " 1=1 "
+var orderId = " AND o.order_id = :orderId "
+var source = " AND o.source = :source "
+---
+sql_where
+++ orderId
+++ (if(vars.queryParam.source != null) source else ' ' )]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:name="query Orders and Order Items" doc:id="ebc35818-d617-4ae3-b109-68000f1eaa6b" config-ref="MySQL_Config">
+			<db:sql ><![CDATA[#["select o.order_id, o.source, o.customer_name, o.contact, o.total_amount , o.order_date, o.payment_type, 
+it.item_id , it.price , it.product_name , it.quantity 
+from orders o
+join order_items it on it.order_id = o.order_id 
+where $(vars.dynamic_where default ' 1!=1 ')"]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	orderId: vars.uriParams.orderId,
+	source: vars.queryParam.source
+}]]]></db:input-parameters>
+		</db:select>
+        <ee:transform doc:name="response">
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
-{
-  orderId: "ORD12345",
-  source: "Yummy App",
-  customer: "Alice",
-  items: [
-    {
-      productId: "P1001",
-      name: "Chicken Meal",
-      price: 200,
-      quantity: 2
-    }, 
-    {
-      productId: "P2002",
-      name: "Burger",
-      price: 150,
-      quantity: 1
-    }
-  ],
-  totalAmount: 550,
-  orderDate: "2025-02-07T10:00:00Z"
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
+payload groupBy $.order_id mapObject {
+    orderId: $$,
+    source: $[0].source,
+    customer: $[0].customer_name,
+    items: $ map {
+        productId: $.item_id,
+        name: $.product_name,
+        price: $.price,
+        quantity: $.quantity
+    },
+    totalAmount: $[0].total_amount,
+    orderDate: $[0].order_date as DateTime
+}]]></ee:set-payload>
             </ee:message>
         </ee:transform>
     </flow>
