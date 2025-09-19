@@ -15,7 +15,12 @@ http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/sc
     </http:listener-config>
     <apikit:config name="jfc-order-sapi-config" api="resource::94ae4f55-1948-49e6-aa22-797c335784d4:jfc-order-sapi:1.0.0:raml:zip:jfc-order-sapi.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
     <db:config name="MySQL_Config" doc:name="Database Config" doc:id="05a43d3f-aa56-4f61-bb4b-3511168cc331" >
-		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${secure::db.user}" password="${secure::db.pass}" database="${db.name}" />
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${secure::db.user}" password="${secure::db.pass}" database="${db.name}" >
+			<reconnection >
+				<reconnect-forever />
+			</reconnection>
+			<db:pooling-profile maxPoolSize="2" minPoolSize="1" />
+		</db:my-sql-connection>
 	</db:config>
 	<api-gateway:autodiscovery apiId="${api-id}" ignoreBasePath="true" doc:name="API Autodiscovery" doc:id="28c872a2-151c-40b7-9a52-e4cde949219d" flowRef="jfc-order-sapi-main" />
 	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="b9ddebff-f771-40a7-9d73-151660319f05" file="properties/sandbox.yaml" key="${enc.key}" >
