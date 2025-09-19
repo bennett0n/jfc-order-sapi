@@ -1,0 +1,14 @@
+%dw 2.0
+
+type auto_8581a5b8_901e_4f90_b20e_0daadbae13e6_Input_Payload = {
+  totalAmount: Number, 
+  orderId: String, 
+  contact?: String, 
+  source: String, 
+  items: Array<{    quantity: Number,     productId: String,     price: Number,     name: String,     _?: Any  }>, 
+  orderDate?: String, 
+  customerName: String, 
+  paymentType?: String, 
+  _?: Any
+}
+

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<sub-flow name="get-orders-sub-flow" doc:id="6811271e-5299-4e06-8c28-9ff386783a3b" >
+		<set-variable value="#[attributes.queryParams]" doc:name="queryParam" doc:id="8e18508a-e76a-4a29-a50f-1b2c994651b8" variableName="queryParam" />
+		<set-variable value="#[attributes.uriParams]" doc:name="uriParams" doc:id="b8937b37-148b-4ae9-ad46-13db1da68fa4" variableName="uriParams" />
+		<ee:transform doc:name="generate dynamic_where" doc:id="7118ab7c-bada-4de3-9173-a8f362b2f0f6">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable resource="dwl/orders-dynamic-where.dwl" variableName="dynamic_where" />
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:name="query Orders and Order Items" doc:id="ebc35818-d617-4ae3-b109-68000f1eaa6b" config-ref="MySQL_Config">
+			<db:sql><![CDATA[#[p('sql.query.orders.select') ++ vars.dynamic_where]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	orderId: vars.uriParams.orderId,
+	source: vars.queryParam.source
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="6d1d2664-ca5d-48ab-bd9c-42746200c0eb" >
+			<when expression="#[!isEmpty(payload)]">
+				<ee:transform doc:name="response">
+            <ee:message>
+				<ee:set-payload resource="dwl/get-order-response.dwl" />
+            </ee:message>
+        </ee:transform>
+			</when>
+			<otherwise >
+				<raise-error doc:name="APP:NO_RECORD_FOUND" doc:id="0de224e7-4530-4985-82c0-b38bbeb0af37" type="APP:NO_RECORD_FOUND"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="post-orders-sub-flow" doc:id="8581a5b8-901e-4f90-b20e-0daadbae13e6" >
+		<set-variable value="#[payload]" doc:name="input_payload" doc:id="367817ab-811e-4a47-9203-9f28174f2672" variableName="input_payload" />
+		<try doc:name="Try" doc:id="74ad8d37-d1ec-4122-807f-e1322a75fb3a" transactionalAction="ALWAYS_BEGIN">
+			<db:insert doc:name="Insert order" doc:id="b5a96a08-db10-4c4e-a58f-53bed341b79d" config-ref="MySQL_Config" transactionalAction="ALWAYS_JOIN">
+			<db:sql><![CDATA[insert into orders (order_id, source, customer_name, total_amount, order_date, contact, payment_type ) 
+values (:order_id, :source, :customer_name, :total_amount, :order_date, :contact, :payment_type )]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	order_id: vars.input_payload.orderId,
+	source: vars.input_payload.source,
+	customer_name: vars.input_payload.customerName,
+	total_amount: vars.input_payload.totalAmount,
+	order_date: vars.input_payload.orderDate replace "T" with " " replace "Z" with "",
+	contact: vars.input_payload.contact,
+	payment_type: vars.input_payload.paymentType
+	}]]]></db:input-parameters>
+		</db:insert>
+			<db:bulk-insert doc:name="Bulk insert order_items" doc:id="cfec82e3-e308-4d3e-b23e-c5a1e96c2bed" config-ref="MySQL_Config" transactionalAction="ALWAYS_JOIN">
+			<db:bulk-input-parameters><![CDATA[#[vars.input_payload.items map {
+	item_id: vars.input_payload.orderId ++ '|' ++ $.productId,
+	order_id: vars.input_payload.orderId,
+	product_name: $.name,
+	price: $.price,
+	quantity: $.quantity
+}]]]></db:bulk-input-parameters>
+			<db:sql><![CDATA[insert into order_items (item_id, order_id, product_name, price, quantity) 
+values (:item_id, :order_id, :product_name, :price, :quantity)]]></db:sql>
+		</db:bulk-insert>
+		</try>
+		<ee:transform doc:name='message: "Order submitted"'>
+            <ee:message>
+				<ee:set-payload resource="dwl/post-order-response.dwl" />
+            </ee:message>
+        </ee:transform>
+	</sub-flow>
+</mule>

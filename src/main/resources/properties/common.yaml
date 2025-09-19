@@ -1,0 +1,19 @@
+
+listener:
+  protocol: "HTTP"
+  host: "0.0.0.0"
+  port: "8081"
+  
+
+sql:
+  query:
+    orders: 
+      select: |
+        select o.order_id, o.source, o.customer_name, o.contact, o.total_amount , o.order_date, o.payment_type, 
+        it.item_id , it.price , it.product_name , it.quantity 
+        from orders o
+        left join order_items it on it.order_id = o.order_id
+        where 1=1 
+      dynamic-where:
+        orderId: " AND o.order_id = :orderId "
+        source: " AND o.source = :source "
