@@ -19,7 +19,7 @@ http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/sc
 			<reconnection >
 				<reconnect-forever />
 			</reconnection>
-			<db:pooling-profile maxPoolSize="2" minPoolSize="1" />
+			<db:pooling-profile maxPoolSize="${db.pool.max}" minPoolSize="${db.pool.min}" maxIdleTime="${db.pool.idle}"/>
 		</db:my-sql-connection>
 	</db:config>
 	<api-gateway:autodiscovery apiId="${api-id}" ignoreBasePath="true" doc:name="API Autodiscovery" doc:id="28c872a2-151c-40b7-9a52-e4cde949219d" flowRef="jfc-order-sapi-main" />

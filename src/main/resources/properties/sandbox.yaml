@@ -7,3 +7,7 @@ db:
   name: "sql12799150"
   user: "![hodnezwz+3Mc5RCzcRLGhg==]"
   pass: "![8+17NzRbMj/t7NNoSQydxg==]"
+  pool:
+    min: "1"
+    max: "2"
+    idle: "300"
